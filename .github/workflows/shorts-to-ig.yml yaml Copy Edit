@@ -1,0 +1,45 @@
+# File: .github/workflows/shorts-to-ig.yml
+name: Auto‑Post Shorts → Instagram
+
+on:
+  schedule:
+    - cron: '0 8 * * *'    # runs daily at 8 AM IST
+  workflow_dispatch:      # manual trigger
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Cache Insta session
+        uses: actions/cache@v3
+        with:
+          path: .session/
+          key: ${{ runner.os }}-insta-${{ secrets.IG_USERNAME }}
+          restore-keys: |
+            ${{ runner.os }}-insta-
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install yt-dlp feedparser instagrapi
+
+      - name: Run sync script
+        env:
+          YT_CHANNEL_ID: ${{ secrets.YT_CHANNEL_ID }}
+          IG_USERNAME:   ${{ secrets.IG_USERNAME }}
+          IG_PASSWORD:   ${{ secrets.IG_PASSWORD }}
+        run: python sync_to_ig.py
+
+      - name: Save Insta session
+        if: success()
+        uses: actions/upload-artifact@v3
+        with:
+          name: insta-session
+          path: .session/
