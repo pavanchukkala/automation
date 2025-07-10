@@ -1,9 +1,8 @@
-# File: .github/workflows/shorts-to-ig.yml
 name: Auto‑Post Shorts → Instagram
 
 on:
   schedule:
-    - cron: '0 8 * * *'    # runs daily at 8 AM IST
+    - cron: '0 8 * * *'    # daily at 8 AM IST
   workflow_dispatch:      # manual trigger
 
 jobs:
