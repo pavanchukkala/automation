@@ -1,44 +1,43 @@
-import os
-import subprocess
 import feedparser
+import yt_dlp
 from instagrapi import Client
-from yt_dlp import YoutubeDL
+import os
 
-# 1. Fetch latest YouTube Short ID
-feed_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={os.getenv('YT_CHANNEL_ID')}"
-feed     = feedparser.parse(feed_url)
-video_id = feed.entries[0].yt_videoid
-video_url = f"https://youtu.be/{video_id}"
-filename = f"{video_id}.mp4"
+# Hardcoded credentials – for testing ONLY
+YT_CHANNEL_ID = "UCjECts5K34yUPWAQ-QziZJA"
+IG_USERNAME = "kegth_group"
+IG_PASSWORD = "Kegth@2025"
 
-# 2. Extract metadata (title, description, tags) via yt-dlp API
-ydl_opts = {'quiet': True, 'skip_download': True}
-with YoutubeDL(ydl_opts) as ydl:
-    info = ydl.extract_info(video_url, download=False)
-title       = info.get('title', '').strip()
-description = info.get('description', '').strip()
-tags_list   = info.get('tags', [])
+# Login to Instagram
+cl = Client()
+cl.login(IG_USERNAME, IG_PASSWORD)
 
-# Build a hashtag string from up to 10 tags
-hashtags = ' '.join('#' + t.replace(' ', '') for t in tags_list[:10])
+# Fetch latest YouTube Short
+rss_url = f"https://www.youtube.com/feeds/videos.xml?channel_id={YT_CHANNEL_ID}"
+feed = feedparser.parse(rss_url)
+latest = feed.entries[0]
+video_url = latest.link
+title = latest.title
+description = latest.get("media_description", "") or latest.get("summary", "")
+tags = latest.get("media_keywords", "").split(",") if latest.get("media_keywords") else []
 
-# Combine into one Instagram caption
-caption = f"{title}\n\n{description}\n\n{hashtags}"
+# Download video using yt-dlp
+video_opts = {
+    "outtmpl": "short.mp4",
+    "format": "mp4",
+    "quiet": True,
+    "noplaylist": True,
+    "merge_output_format": "mp4"
+}
+with yt_dlp.YoutubeDL(video_opts) as ydl:
+    ydl.download([video_url])
 
-# 3. Download the Short video via yt-dlp CLI
-subprocess.run([
-    "yt-dlp",
-    video_url,
-    "-o", filename,
-    "--format", "mp4",
-    "--max-downloads", "1"
-], check=True)
+# Create IG caption
+caption = f"{title}\n\n{description}\n\n" + " ".join([f"#{tag.strip().replace(' ', '')}" for tag in tags if tag.strip()])[:2200]
 
-# 4. Log in to Instagram (session cached in .session/)
-os.makedirs(".session", exist_ok=True)
-cl = Client(session_folder=".session")
-cl.login(os.getenv("IG_USERNAME"), os.getenv("IG_PASSWORD"))
+# Upload to Instagram Reels
+cl.clip_upload("short.mp4", caption=caption)
 
-# 5. Post as a Reel with full metadata
-cl.video_upload(filename, caption=caption)
-print(f"✅ Posted {filename} with title, description & tags to Instagram Reels")
+# Cleanup
+os.remove("short.mp4")
+print("✅ Uploaded to Instagram successfully.")
